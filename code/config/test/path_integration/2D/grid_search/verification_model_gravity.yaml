@@ -1,0 +1,62 @@
+model:
+  wiring:
+  - type: pattern
+    source: B
+    target: I
+    pattern: identity
+  - type: pattern
+    source: I
+    target: R
+    pattern: identity
+  - type: gnm
+    source: R
+    target: R
+    k_avg: R_k_avg
+    k_min: R_k_min
+    k_max: R_k_max
+    self_loops: R_self_loops
+    mode: heterogeneous
+  input_layer:
+    encoding: base2
+    features: 2
+    resolution: 8
+    redundancy: 1
+  reservoir_layer:
+    n_nodes: 100
+    p: 0.5
+    init: random
+  output_layer:
+    n_nodes: 2
+  training:
+    seed: 0
+    batch_size: 128
+    epochs: 100
+    accuracy_threshold: 0.05
+    optim:
+      name: ridge
+      params:
+        alpha: 1.0e-3
+    evaluation: test
+  variables:
+    R_k_avg: 2
+    R_k_max: 6
+    R_self_loops: 0
+    R_k_min: 0
+logging:
+  out_path: /tmp/boolean_reservoir/test/path_integration/2D/grid_search/verification_model_gravity
+dataset:
+  dimensions: 2
+  steps: 5
+  mode: acceleration
+  strategy:
+    name: SimpleRandomWalkStrategy
+  boundary:
+    name: LinearSoftBoundary
+    params:
+      spring_constant: 1.0
+  split:
+    train: 0.8
+    dev: 0.1
+    test: 0.1
+  samples: 20000
+  seed: 0

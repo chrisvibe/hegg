@@ -1,0 +1,3 @@
+[submodule "code/project/parallel_grid_search"]
+	path = code/project/parallel_grid_search
+	url = https://github.com/chrisvibe/parallel_grid_search.git

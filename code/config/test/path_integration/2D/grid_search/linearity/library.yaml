@@ -1,0 +1,96 @@
+# Path integration dataset library — 2D
+#
+# Mother: NoBoundary — neutral base, no boundary interaction. Each universe
+# overrides only the boundary (and optionally max_acceleration or mode).
+#
+# Profiles span qualitatively distinct regimes, not arbitrary spectrum points:
+#
+#   (mother)               — no boundary, velocity. Pure integration baseline.
+#   soft_boundary          — soft boundary (spring). Velocity is actual motion; linear.
+#   hard_boundary          — hard boundary, full acceleration. Clearly non-linear.
+#   hard_boundary_low_acc  — hard boundary, low acceleration. Transition point.
+#   displacement           — displacement mode. Always linear by telescoping identity.
+#
+# Summary table (linear baseline = PathIntegrationLinearityModel, no reservoir):
+#
+#   universe              mode         boundary             baseline  what it tests
+#   ──────────────────────────────────────────────────────────────────────────────
+#   (mother)              velocity     none                 100%      pure integration, no boundary
+#   soft_boundary         velocity     soft Linear k=0.5    100%      integration + soft containment — current production
+#   hard_boundary         velocity     hard PolygonBndry    ~8.8%     integration + boundary model required
+#   hard_boundary_low_acc velocity     hard PolygonBndry   ~99.4%     boundary just barely reached
+#   displacement          displacement none                 100%      trivially linear by telescoping identity
+#
+# Verify or re-measure any score with linearity_probe.py:
+#   python project/path_integration/test/linearity_probe.py \
+#       project/path_integration/test/config/2D/grid_search/linearity/library.yaml [--universe <name>]
+#
+# Dataset properties are verified by:
+#   pytest project/path_integration/test/test_dataset_properties.py -v
+
+dataset:
+  dimensions: 2
+  steps: 5
+  mode: velocity
+  strategy:
+    name: PhysicsWalkStrategy
+    params:
+      max_acceleration: 0.5
+      mass: 1.0
+      friction_coeff: 0.1
+      friction_order: 2
+      max_speed: 10.0
+  boundary:
+    name: NoBoundary
+  samples: 5000
+  seed: 0
+
+multiverse_overrides:
+
+  # ── soft_boundary ───────────────────────────────────────────────────
+  # Soft boundary modifies velocity rather than clipping position, so the
+  # trapezoidal rule holds and the task is linear. Current production config.
+  # Linear baseline: 100%
+  soft_boundary:
+    dataset:
+      boundary:
+        name: LinearSoftBoundary
+        params:
+          spring_constant: 0.5
+
+  # ── hard_boundary ───────────────────────────────────────────────────────────────
+  # Hard boundary: position is clipped at the wall but velocity carries on.
+  # The model must integrate + detect boundary hits — genuinely non-linear.
+  # Linear baseline: ~8.8%
+  hard_boundary:
+    dataset:
+      boundary:
+        name: PolygonBoundary
+        params:
+          n_sides: 12
+          radius: 1.0
+          rotation: pi/4
+
+  # ── hard_boundary_low_acc ──────────────────────────────────────────────────────────────
+  # Hard boundary, reduced acceleration. Only a small fraction of paths hit the
+  # wall; locates the linear↔non-linear transition precisely.
+  # Linear baseline: ~99.4%  (max_acceleration=0.105)
+  hard_boundary_low_acc:
+    dataset:
+      boundary:
+        name: PolygonBoundary
+        params:
+          n_sides: 12
+          radius: 1.0
+          rotation: pi/4
+      strategy:
+        params:
+          max_acceleration: 0.105
+
+  # ── displacement ───────────────────────────────────────────────────────────────────
+  # Displacement mode: x[i] = actual Δp[i]. Telescoping identity guarantees
+  # y = Σ x[i] exactly — trivially linear regardless of boundary.
+  # Linear baseline: 100%
+  displacement:
+    dataset:
+      mode: displacement

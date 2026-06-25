@@ -1,0 +1,59 @@
+logging:
+  out_path: out/temporal/density/grid_search/design_choices/snyder
+  save_keys: null
+  grid_search:
+    n_samples: 1
+    run: [train]
+model:
+  wiring:
+  - type: pattern
+    source: B
+    target: I
+    pattern: identity
+  - type: gnm
+    source: "I+R"
+    target: R
+    k_avg: R_k_avg
+    k_min: 0
+    k_max: 25
+    self_loops: R_self_loops
+    mode: R_mode
+  input_layer:
+    perturbation: [override, xor]
+    encoding: base2
+    features: 1
+    resolution: 1
+    redundancy: [1, 2, 3]
+    ticks: ['1', '2']
+  output_layer:
+    n_nodes: 1
+    mode: [time-series, classification]
+  reservoir_layer:
+    init: [zeros, random, random-warmup]
+    n_nodes: [128, 512]
+    reset: true
+  training:
+    epochs: 40
+    evaluation: dev
+    optim:
+      name: ridge
+      params:
+        alpha: 1.0e-3
+  variables:
+    R_k_avg: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    R_self_loops: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 1]
+    R_mode: [homogeneous, heterogeneous]
+dataset:
+  name: temporal
+  task: density
+  bits: 10
+  window: [1, 3, 5]
+  delay: [1, 3, 5]
+  split:
+    train: 0.5
+    dev: 0.5
+    test: 0
+  samples: 2048
+  sampling_mode: exhaustive
+  shuffle: false
+  seed: 0

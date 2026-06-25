@@ -1,0 +1,81 @@
+# Claude Code Reference
+
+## What This Project Is
+Boolean Reservoir Computing using Random Boolean Networks (RBNs) as the dynamical reservoir. An RBN is a fixed (untrained) recurrent network of boolean nodes that projects inputs into a high-dimensional binary state space. A linear readout is trained on top — no backprop through the reservoir. Part of the research is uncovering which reservoir design decisions (topology, connectivity, self-loops, init strategy) lead to good task performance.
+
+## Paths
+| Path | Role |
+|---|---|
+| `/code` | Writable working directory — work here |
+| `/repo` | Full repo, read-only mount |
+| `/out` | Training outputs, checkpoints, HDF5 logs |
+| `/data` | Generated & cached datasets (delete if stale after param changes) |
+
+---
+
+## Architecture
+
+### `benchmark/` vs `project/`
+- **`benchmark/`** — shared, reusable infrastructure: physics engine, dataset base classes, parameter base models. Nothing task-specific goes here.
+- **`project/`** — task-specific: model, training, tests, configs. Sub-projects: `boolean_reservoir/` (core model), `path_integration/`, `temporal/`, `parallel_grid_search/`.
+
+### Reservoir Computing Layers
+The model has a clear 4-layer split reflected in both `Params` and `reservoir.py`:
+1. **Input layer** — encodes inputs and perturbs reservoir state
+2. **Reservoir layer** — fixed RBN dynamical system; state evolves but weights don't train
+3. **Output layer** — linear readout trained on reservoir states
+4. **Training** — optimizer, loss, accuracy threshold, evaluation split
+
+The reservoir layer supports multiple **strategies** (topology init, connectivity mode, self-loops, etc.) because a key research goal is understanding which design choices matter. These are not arbitrary — they reflect open questions in the field.
+
+### Encoding: Float → Boolean
+Inputs are typically continuous floats that must be converted to boolean for the RBN. `encoding.py` handles this (`BooleanEncoder`, base2/primes/tally schemes). Some data (temporal bit-streams) starts as boolean and skips encoding. `min_max_normalization` is a **stateful class** — instances store `min_`/`max_` for later inversion via `dataset.inverse_normalize_x/y()`.
+
+### `parameter.py` Pattern
+Every sub-component has a `parameter.py` with Pydantic models (e.g. `InputParams`, `ReservoirParams`, `DatasetParams`). YAML configs map 1:1 to these. **Any YAML field set to a list triggers a grid search** — `generate_param_combinations()` expands to the cartesian product. Math expressions (`pi/4`) are evaluated by `ExpressionEvaluator`.
+
+### `dataset_init.py` per Task
+Each benchmark task has its own `DatasetInit` subclass (`PathIntegrationDatasetInit`, `TemporalDatasetInit`) that wires the dataset to the model — handles normalization, encoding, splitting, and batch rearrangement. This is the glue layer between `benchmark/` and `project/`.
+
+---
+
+## Key Concepts
+
+### reset=False (Path Integration)
+Two flags that **must both be false** together:
+- `dataset.train.reset: false` → each sample's origin = previous endpoint; `rearrange_for_batch_continuity(B)` reshapes M samples into B parallel streams
+- `model.reservoir_layer.reset: false` → reservoir state persists across batches
+
+Continuity invariant: `y[i] + x[i+1].sum(dim=0) == y[i+1]`
+Call `model.reset_reservoir(hard_reset=True)` between independent stream evaluations.
+
+### KQ / GR vs Training
+Training measures task accuracy. KQ/GR measure **reservoir capacity** independently of the task:
+- **KQ (Kernel Quality)**: `tau=0` — all inputs random; tests input separability
+- **GR (Generalization Rank)**: `tau>0` — `tau` bits identical across samples; tests generalization
+
+Uses `.kqgr()` dataset init path, not `.train()`.
+
+### Verification Models (`test_verification_model.py`)
+Sanity-check models that replace `BooleanReservoir` with a simple linear model (decode → scale → sum steps). Used to verify the full pipeline (dataset, encoding, normalization, training) works before blaming the reservoir. Should reach ≥ 0.9 accuracy. Must implement `save()` and `reset_reservoir(**kwargs)` as no-ops.
+
+### Boundaries (Path Integration)
+Two families: **hard** (`NoBoundary`, `IntervalBoundary`, `PolygonBoundary`) — positions are clipped via `clip_to_boundary()` on floating-point drift. **Soft** (`LinearSoftBoundary`, etc.) — restoring force field, positions can legally exceed the boundary, no clipping.
+
+---
+
+## Tests
+Each sub-project has a `test/` folder with pytest files and a `config/` subfolder for test-specific YAML configs (separate from production configs in `config/`).
+
+```bash
+pytest benchmark/ -v                                  # fast unit tests
+pytest project/boolean_reservoir/test/ -v             # graph + KQ/GR
+pytest project/path_integration/test/test_reset_false.py::test_reset_false_dataset_continuity -v  # fast continuity check
+pytest project/path_integration/test/ -v             # full suite (includes training)
+```
+
+Data cache paths:
+```
+data/path_integration/{coordinate}/{dims}D/{steps}s/{strategy}/{boundary}/
+data/temporal/{task}/{dims}D/s-{sampling_mode}/b-{bits}/w-{window}/d-{delay}/
+```

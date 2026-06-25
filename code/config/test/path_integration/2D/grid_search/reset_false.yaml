@@ -1,0 +1,77 @@
+logging:
+  out_path: /tmp/boolean_reservoir/test/path_integration/2D/grid_search/reset_false
+  save_keys: null
+  grid_search:
+    n_samples: 1
+model:
+  wiring:
+  - type: pattern
+    source: B
+    target: I
+    pattern: identity
+  - type: pattern
+    source: I
+    target: R
+    pattern: identity
+  - type: gnm
+    source: R
+    target: R
+    k_avg: R_k_avg
+    k_min: R_k_min
+    k_max: R_k_max
+    self_loops: R_self_loops
+    mode: heterogeneous
+  input_layer:
+    perturbation: override
+    encoding: base2
+    features: 2
+    redundancy: 10
+    resolution: 3
+    chunk_size: 3
+    ticks: '1'
+  output_layer:
+    n_nodes: 2
+  reservoir_layer:
+    init: random
+    n_nodes: 1024
+    reset: false
+  training:
+    reset: false
+    accuracy_threshold: 0.25
+    batch_size: 1024
+    criterion: MSE
+    epochs: 40
+    evaluation: dev
+  variables:
+    R_k_avg: 3.0
+    R_k_min: 0
+    R_k_max: 10
+    R_self_loops: 0.3
+dataset:
+  train:
+    reset: false
+    encoding:
+    - cartesian
+    - polar
+    dimensions: 2
+    steps: 5
+    strategy:
+      name: PhysicsWalkStrategy
+      params:
+        max_force: 0.1
+        mass: 1.0
+        friction_coeff: 0.1
+        friction_order: 2
+        max_speed: 10
+    boundary:
+      name: PolygonBoundary
+      params:
+        n_sides: 12
+        radius: 1.0
+        rotation: pi/4
+    split:
+      train: 0.5
+      dev: 0.3
+      test: 0.2
+    samples: 20000
+    seed: 0

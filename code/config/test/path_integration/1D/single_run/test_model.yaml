@@ -1,0 +1,60 @@
+model:
+  wiring:
+  - type: pattern
+    source: B
+    target: I
+    pattern: identity
+  - type: pattern
+    source: I
+    target: R
+    pattern: identity
+  - type: gnm
+    source: R
+    target: R
+    k_avg: R_k_avg
+    k_min: R_k_min
+    k_max: R_k_max
+    self_loops: R_self_loops
+    mode: heterogeneous
+  input_layer:
+    perturbation: override
+    resolution: 8
+    encoding: binary_embedding
+    features: 1
+    redundancy: 6
+    chunk_size: 48
+    seed: 0
+  output_layer:
+    n_nodes: 1
+    seed: 0
+  reservoir_layer:
+    init: zeros
+    n_nodes: 1000
+    p: 0.5
+    seed: 0
+  training:
+    batch_size: 100
+    epochs: 100
+    accuracy_threshold: 0.05
+    evaluation: test
+    seed: 0
+  variables:
+    R_k_avg: 2
+    R_k_max: 20
+    R_self_loops: 0.5
+    R_k_min: 0
+logging:
+  out_path: /tmp/boolean_reservoir/test/path_integration/1D/single_run/test_model
+dataset:
+  dimensions: 1
+  steps: 5
+  strategy:
+    name: LevyFlightStrategy
+  boundary:
+    name: IntervalBoundary
+  split:
+    train: 0.5
+    dev: 0.3
+    test: 0.2
+  samples: 20000
+  seed: 0
